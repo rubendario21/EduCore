@@ -1,0 +1,3 @@
+# EduCore no se sirve desde Apache/WAMP. Este directorio contiene código fuente,
+# configuración local (.env) y archivos privados: se bloquea todo acceso HTTP.
+Require all denied

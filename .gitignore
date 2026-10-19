@@ -1,0 +1,33 @@
+# Dependencias y builds
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Cliente Prisma generado
+apps/api/src/generated/
+
+# Secretos y configuración local (solo se versionan los .env.example)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Almacenamiento local de archivos y backups
+storage/
+backups/
+*.dump
+*.sql.gz
+
+# Logs y sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Configuración local de la institución (datos reales del colegio)
+*.local.json

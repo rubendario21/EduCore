@@ -1,0 +1,31 @@
+{
+  "institution": {
+    "legalName": "Institución Educativa de Ejemplo",
+    "tradeName": "Colegio Ejemplo",
+    "taxId": "900000000",
+    "taxIdDv": "5",
+    "daneCode": "111001000000",
+    "email": "contacto@colegio-ejemplo.edu.co",
+    "phone": "+57 601 000 0000",
+    "address": "Calle 1 # 2-3",
+    "city": "Bogotá",
+    "department": "Bogotá D.C."
+  },
+  "settings": {
+    "timezone": "America/Bogota",
+    "locale": "es-CO",
+    "currency": "COP"
+  },
+  "campuses": [{ "code": "PRINCIPAL", "name": "Sede principal", "isMain": true, "city": "Bogotá" }],
+  "shifts": [
+    { "code": "MANANA", "name": "Mañana" },
+    { "code": "TARDE", "name": "Tarde" }
+  ],
+  "admin": {
+    "email": "rectoria@colegio-ejemplo.edu.co",
+    "documentType": "CC",
+    "documentNumber": "1000000000",
+    "firstNames": "Nombre",
+    "lastNames": "Apellido"
+  }
+}
