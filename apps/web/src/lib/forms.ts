@@ -16,8 +16,9 @@ export function applyServerErrors<T extends FieldValues>(
   if (error instanceof ApiError && error.fieldErrors.length > 0) {
     const unmatched: string[] = [];
     for (const { field, messages } of error.fieldErrors) {
+      // Los campos anidados (`person.firstNames`) se marcan con su ruta completa.
       const root = field.split('.')[0]!;
-      if (fields.includes(root)) setError(root as Path<T>, { message: messages.join(' ') });
+      if (fields.includes(root)) setError(field as Path<T>, { message: messages.join(' ') });
       else unmatched.push(...messages);
     }
     return unmatched.length > 0 ? unmatched.join(' ') : null;

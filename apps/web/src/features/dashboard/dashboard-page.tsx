@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState, Skeleton } from '@/components/ui/feedback';
 import { useAuth } from '@/features/auth/auth-context';
+import { useProfile } from '@/features/auth/profile-context';
 import { apiClient } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
 
@@ -207,8 +208,20 @@ function DashboardContent() {
   );
 }
 
+const PORTAL_MESSAGES = {
+  STUDENT:
+    'Aquí verás tus calificaciones, asistencia, horario y tareas a medida que la institución active cada módulo.',
+  GUARDIAN:
+    'Aquí podrás seguir las calificaciones, la asistencia y los comunicados de tus estudiantes a medida que la institución active cada módulo.',
+  TEACHER: 'Tus cursos y listas de clase están en Mis cursos.',
+} as const;
+
 export function HomePage() {
   const { user, can } = useAuth();
+  const { profile } = useProfile();
+  // El tablero institucional es del perfil administrativo, aunque la cuenta tenga el permiso.
+  const showDashboard =
+    (profile === 'STAFF' || profile === null) && can(PERMISSIONS.DASHBOARD_VIEW);
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <PageHeader
@@ -219,13 +232,14 @@ export function HomePage() {
             : undefined
         }
       />
-      {can(PERMISSIONS.DASHBOARD_VIEW) ? (
+      {showDashboard ? (
         <DashboardContent />
       ) : (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Bienvenido a EduCore. Las secciones de tu perfil (horarios, calificaciones, tareas)
-            estarán disponibles a medida que la institución active cada módulo.
+            {profile && profile !== 'STAFF'
+              ? PORTAL_MESSAGES[profile]
+              : 'Bienvenido a EduCore. Las secciones de tu perfil (horarios, calificaciones, tareas) estarán disponibles a medida que la institución active cada módulo.'}
           </CardContent>
         </Card>
       )}

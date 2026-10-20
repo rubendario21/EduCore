@@ -73,7 +73,14 @@ function CreateUserDialog({
       }),
     onSuccess: async (user) => {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success(`Usuario creado. Enviamos a ${user.email} el enlace para activar su cuenta.`);
+      if (user.activationEmail === 'FAILED') {
+        toast.warning(
+          `Usuario creado, pero no se pudo enviar el correo a ${user.email}. Revisa la configuración del correo y usa "Reenviar acceso" en su ficha.`,
+          { duration: 10_000 },
+        );
+      } else {
+        toast.success(`Usuario creado. Enviamos a ${user.email} el enlace para activar su cuenta.`);
+      }
       onOpenChange(false);
       form.reset();
       navigate(`/usuarios/${user.id}`);

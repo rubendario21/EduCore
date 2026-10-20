@@ -45,11 +45,12 @@ export class PermissionSyncService implements OnApplicationBootstrap {
 
   /** Inserta o actualiza los permisos del catálogo y elimina los retirados del código. */
   async syncCatalog(tx: Prisma.TransactionClient): Promise<void> {
-    for (const permission of PERMISSION_CATALOG) {
+    // Los alcances admitidos viven solo en el código (allowedScopesFor), no en la tabla.
+    for (const { code, module, description } of PERMISSION_CATALOG) {
       await tx.permission.upsert({
-        where: { code: permission.code },
-        create: permission,
-        update: { module: permission.module, description: permission.description },
+        where: { code },
+        create: { code, module, description },
+        update: { module, description },
       });
     }
     const removed = await tx.permission.deleteMany({

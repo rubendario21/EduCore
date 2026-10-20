@@ -1,11 +1,13 @@
 import { PERMISSIONS, RECORD_STATUSES } from '@educore/shared';
 import { useQuery } from '@tanstack/react-query';
+import { LayoutTemplate } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { z } from 'zod';
 import { CatalogManager } from '@/components/catalog-manager';
 import { PageHeader } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/features/auth/auth-context';
@@ -15,6 +17,8 @@ import {
   useShifts,
 } from '@/features/institution/institution.service';
 import { codeField, dateField, requiredText } from '@/lib/forms';
+import { CurriculumTab } from '../components/curriculum-tab';
+import { TemplateDialog } from '../components/template-dialog';
 import { formatDate } from '@/lib/format';
 import {
   type AcademicYear,
@@ -507,11 +511,19 @@ function GroupsTab({ canManage }: { canManage: boolean }) {
 export function AcademicsPage() {
   const { can } = useAuth();
   const manage = can(PERMISSIONS.ACADEMICS_MANAGE);
+  const [template, setTemplate] = useState(false);
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <PageHeader
         title="Estructura académica"
-        description="Años lectivos, niveles, grados, áreas, asignaturas y grupos."
+        description="Años lectivos, niveles, grados, áreas, asignaturas, grupos y plan de estudios."
+        actions={
+          manage && (
+            <Button variant="outline" onClick={() => setTemplate(true)}>
+              <LayoutTemplate aria-hidden /> Plantilla colombiana
+            </Button>
+          )
+        }
       />
       <Tabs defaultValue="years">
         <TabsList>
@@ -519,6 +531,7 @@ export function AcademicsPage() {
           <TabsTrigger value="levels">Niveles y grados</TabsTrigger>
           <TabsTrigger value="subjects">Áreas y asignaturas</TabsTrigger>
           <TabsTrigger value="groups">Grupos</TabsTrigger>
+          <TabsTrigger value="curriculum">Plan de estudios</TabsTrigger>
         </TabsList>
         <TabsContent value="years">
           <YearsTab canManage={can(PERMISSIONS.ACADEMIC_YEARS_MANAGE)} />
@@ -532,7 +545,11 @@ export function AcademicsPage() {
         <TabsContent value="groups">
           <GroupsTab canManage={manage} />
         </TabsContent>
+        <TabsContent value="curriculum">
+          <CurriculumTab canManage={manage} />
+        </TabsContent>
       </Tabs>
+      {manage && <TemplateDialog open={template} onOpenChange={setTemplate} />}
     </div>
   );
 }

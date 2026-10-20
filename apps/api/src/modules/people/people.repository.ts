@@ -96,12 +96,15 @@ export class PeopleRepository {
     filter: {
       search?: string;
       status?: Prisma.StudentWhereInput['status'];
+      /** Restricción de alcance (ASSIGNED); sin ella, toda la institución. */
+      scope?: Prisma.StudentWhereInput;
       skip: number;
       take: number;
     },
   ) {
     const where: Prisma.StudentWhereInput = {
       institutionId,
+      ...(filter.scope && { AND: [filter.scope] }),
       ...(filter.status && { status: filter.status }),
       ...(filter.search && {
         OR: [{ person: personSearch(filter.search) }, { code: contains(filter.search) }],
@@ -126,6 +129,18 @@ export class PeopleRepository {
     db: Db = this.prisma,
   ): Promise<StudentRecord | null> {
     return db.student.findFirst({ where: { id, institutionId }, include: studentInclude });
+  }
+
+  /** Estudiante dentro del alcance del usuario (fuera de él se trata como inexistente). */
+  findVisibleStudent(
+    institutionId: string,
+    id: string,
+    scope?: Prisma.StudentWhereInput,
+  ): Promise<StudentRecord | null> {
+    return this.prisma.student.findFirst({
+      where: { id, institutionId, ...(scope && { AND: [scope] }) },
+      include: studentInclude,
+    });
   }
 
   /** Bloquea el estudiante durante la transacción (cambios en sus vínculos). */

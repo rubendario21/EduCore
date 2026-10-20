@@ -19,6 +19,13 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AUTH_RATE_LIMIT_KEY } from './modules/auth/decorators/auth.decorators';
 import { HealthModule } from './modules/health/health.module';
 import { InstitutionsModule } from './modules/institutions/institutions.module';
+import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
+import { TeachingModule } from './modules/teaching/teaching.module';
+import { AdmissionsModule } from './modules/admissions/admissions.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
+import { ImportsModule } from './modules/imports/imports.module';
+import { GradingModule } from './modules/grading/grading.module';
+import { GradebookModule } from './modules/gradebook/gradebook.module';
 import { PeopleModule } from './modules/people/people.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -56,6 +63,13 @@ import { UsersModule } from './modules/users/users.module';
     AcademicsModule,
     DashboardModule,
     PeopleModule,
+    EnrollmentsModule,
+    TeachingModule,
+    AdmissionsModule,
+    PrivacyModule,
+    ImportsModule,
+    GradingModule,
+    GradebookModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

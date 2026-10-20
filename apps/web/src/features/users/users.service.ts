@@ -17,6 +17,8 @@ export interface User {
   roles: Array<{ id: string; code: string; name: string }>;
   lastLoginAt: string | null;
   createdAt: string;
+  /** Solo al crear la cuenta o dar acceso: si el correo de activación salió. */
+  activationEmail?: 'SENT' | 'FAILED' | null;
 }
 
 export interface UserPage {

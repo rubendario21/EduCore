@@ -19,6 +19,12 @@ import {
 import { type Member, type RoleWithPermissions, UsersRepository } from './users.repository';
 
 export const UserErrors = {
+  mailDeliveryFailed: () =>
+    new AppException(
+      HttpStatus.BAD_GATEWAY,
+      'MAIL_DELIVERY_FAILED',
+      'No fue posible enviar el correo. Revisa la configuración del correo (SMTP) e inténtalo de nuevo.',
+    ),
   notFound: () => new AppException(HttpStatus.NOT_FOUND, 'USER_NOT_FOUND', 'El usuario no existe.'),
   emailTaken: () =>
     new AppException(
@@ -177,8 +183,15 @@ export class UsersService {
       return (await this.repository.findMember(auth.institutionId, user.id, tx))!;
     });
 
-    if (pending.mail) this.passwords.deliver(pending.mail);
-    return toUserDto(member);
+    return { ...toUserDto(member), activationEmail: await this.deliverActivation(pending.mail) };
+  }
+
+  /** Envía la invitación ya confirmada y dice si salió (null si no hacía falta). */
+  private async deliverActivation(
+    mail: MailMessage | undefined,
+  ): Promise<'SENT' | 'FAILED' | null> {
+    if (!mail) return null;
+    return (await this.passwords.deliverNow(mail)) ? 'SENT' : 'FAILED';
   }
 
   async update(
@@ -382,7 +395,9 @@ export class UsersService {
       );
       return purpose;
     });
-    if (pending.mail) this.passwords.deliver(pending.mail);
+    if (pending.mail && !(await this.passwords.deliverNow(pending.mail))) {
+      throw UserErrors.mailDeliveryFailed();
+    }
     return kind;
   }
 
@@ -446,8 +461,7 @@ export class UsersService {
     };
 
     const member = tx ? await run(tx) : await this.repository.transaction(run);
-    if (pending.mail) this.passwords.deliver(pending.mail);
-    return toUserDto(member);
+    return { ...toUserDto(member), activationEmail: await this.deliverActivation(pending.mail) };
   }
 
   // --- Perfil propio ------------------------------------------------------

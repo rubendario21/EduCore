@@ -6,6 +6,7 @@ import { toDateOnly } from '../../common/validation/colombia';
 import { type Prisma } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuthContext, type ClientInfo } from '../auth/auth.types';
+import { TeachingRepository } from '../teaching/teaching.repository';
 import { UsersService } from '../users/users.service';
 import {
   type CreateGuardianDto,
@@ -22,6 +23,13 @@ import { PersonResolver } from './person-resolver';
 type Tx = Prisma.TransactionClient;
 
 const Errors = {
+  staffHasAssignments: (count: number) =>
+    new AppException(
+      HttpStatus.CONFLICT,
+      'STAFF_HAS_ASSIGNMENTS',
+      `El docente tiene ${count} asignatura(s) asignada(s) vigente(s). Reemplázalo o finaliza sus asignaciones primero.`,
+      { count },
+    ),
   guardianNotFound: () =>
     new AppException(HttpStatus.NOT_FOUND, 'GUARDIAN_NOT_FOUND', 'El acudiente no existe.'),
   guardianExists: () =>
@@ -159,16 +167,16 @@ export class GuardiansService {
     id: string,
     email: string,
     client: ClientInfo,
-  ): Promise<GuardianView> {
+  ): Promise<GuardianView & { activationEmail: 'SENT' | 'FAILED' | null }> {
     const guardian = await this.require(auth, id);
-    await this.users.grantAccessToPerson(
+    const account = await this.users.grantAccessToPerson(
       auth,
       guardian.personId,
       email,
       [SYSTEM_ROLES.GUARDIAN],
       client,
     );
-    return this.get(auth, id);
+    return { ...(await this.get(auth, id)), activationEmail: account.activationEmail ?? null };
   }
 }
 
@@ -179,6 +187,7 @@ export class StaffService {
     private readonly persons: PersonResolver,
     private readonly audit: AuditService,
     private readonly users: UsersService,
+    private readonly teaching: TeachingRepository,
   ) {}
 
   private async require(auth: AuthContext, id: string, tx?: Tx) {
@@ -240,6 +249,18 @@ export class StaffService {
   ): Promise<StaffView> {
     await this.repository.transaction(async (tx) => {
       const member = await this.require(auth, id, tx);
+      // Un docente con asignaturas vigentes no se desactiva ni deja de ser docente:
+      // primero se reemplaza o finaliza su asignación académica.
+      const deactivating = dto.status === 'INACTIVE' && member.status === 'ACTIVE';
+      const leavingTeaching =
+        dto.staffType !== undefined &&
+        dto.staffType !== 'TEACHER' &&
+        member.staffType === 'TEACHER';
+      if (deactivating || leavingTeaching) {
+        await this.teaching.lockStaff(id, tx);
+        const current = await this.teaching.countCurrentAssignmentsOfStaff(id, tx);
+        if (current > 0) throw Errors.staffHasAssignments(current);
+      }
       if (dto.person)
         await this.persons.update(
           auth.institutionId,
@@ -281,9 +302,15 @@ export class StaffService {
     email: string,
     roleCodes: string[],
     client: ClientInfo,
-  ): Promise<StaffView> {
+  ): Promise<StaffView & { activationEmail: 'SENT' | 'FAILED' | null }> {
     const member = await this.require(auth, id);
-    await this.users.grantAccessToPerson(auth, member.personId, email, roleCodes, client);
-    return this.get(auth, id);
+    const account = await this.users.grantAccessToPerson(
+      auth,
+      member.personId,
+      email,
+      roleCodes,
+      client,
+    );
+    return { ...(await this.get(auth, id)), activationEmail: account.activationEmail ?? null };
   }
 }

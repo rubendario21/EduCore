@@ -31,6 +31,7 @@ export const PERMISSIONS = {
   ACADEMICS_READ: 'academics.structure.read',
   ACADEMICS_MANAGE: 'academics.structure.manage',
   ACADEMIC_YEARS_MANAGE: 'academics.years.manage',
+  GRADING_MANAGE: 'academics.grading.manage',
 
   // Comunidad educativa
   STUDENTS_READ: 'students.records.read',
@@ -39,6 +40,28 @@ export const PERMISSIONS = {
   GUARDIANS_MANAGE: 'guardians.records.manage',
   STAFF_READ: 'staff.records.read',
   STAFF_MANAGE: 'staff.records.manage',
+
+  // Matrícula
+  ENROLLMENTS_READ: 'enrollments.records.read',
+  ENROLLMENTS_MANAGE: 'enrollments.records.manage',
+
+  // Evaluación y notas
+  GRADES_READ: 'grades.records.read',
+  GRADES_MANAGE: 'grades.records.manage',
+
+  // Asignación académica (docentes por grupo y asignatura)
+  TEACHING_READ: 'teaching.assignments.read',
+  TEACHING_MANAGE: 'teaching.assignments.manage',
+
+  // Admisiones
+  ADMISSIONS_READ: 'admissions.applications.read',
+  ADMISSIONS_MANAGE: 'admissions.applications.manage',
+  ADMISSIONS_DECIDE: 'admissions.applications.decide',
+
+  // Protección de datos personales (Ley 1581 de 2012)
+  PRIVACY_POLICIES_MANAGE: 'privacy.policies.manage',
+  PRIVACY_CONSENTS_READ: 'privacy.consents.read',
+  PRIVACY_CONSENTS_MANAGE: 'privacy.consents.manage',
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -132,9 +155,17 @@ export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
     description: 'Gestionar años lectivos y períodos',
   },
   {
+    code: PERMISSIONS.GRADING_MANAGE,
+    module: 'academics',
+    description:
+      'Configurar el SIEE de cada año: escala, niveles de desempeño y reglas de promoción',
+  },
+  {
     code: PERMISSIONS.STUDENTS_READ,
     module: 'students',
     description: 'Consultar estudiantes y sus acudientes',
+    // ASSIGNED: solo los estudiantes ubicados en los grupos del docente.
+    allowedScopes: ['ALL', 'ASSIGNED'],
   },
   {
     code: PERMISSIONS.STUDENTS_MANAGE,
@@ -156,6 +187,73 @@ export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
     code: PERMISSIONS.STAFF_MANAGE,
     module: 'staff',
     description: 'Registrar y editar el personal',
+  },
+  {
+    code: PERMISSIONS.ENROLLMENTS_READ,
+    module: 'enrollments',
+    description: 'Consultar matrículas y su historial',
+    allowedScopes: ['ALL', 'ASSIGNED'],
+  },
+  {
+    code: PERMISSIONS.ENROLLMENTS_MANAGE,
+    module: 'enrollments',
+    description: 'Matricular, cambiar de grupo, retirar, trasladar y renovar matrículas',
+  },
+  {
+    code: PERMISSIONS.GRADES_READ,
+    module: 'grades',
+    description: 'Consultar actividades evaluativas y notas',
+    // ASSIGNED: solo las asignaturas y grupos asignados al docente.
+    allowedScopes: ['ALL', 'ASSIGNED'],
+  },
+  {
+    code: PERMISSIONS.GRADES_MANAGE,
+    module: 'grades',
+    description: 'Crear actividades evaluativas y registrar notas en períodos abiertos',
+    allowedScopes: ['ALL', 'ASSIGNED'],
+  },
+  {
+    code: PERMISSIONS.TEACHING_READ,
+    module: 'teaching',
+    description: 'Consultar la asignación académica y las listas de clase',
+    // ASSIGNED: solo las asignaciones propias del docente.
+    allowedScopes: ['ALL', 'ASSIGNED'],
+  },
+  {
+    code: PERMISSIONS.TEACHING_MANAGE,
+    module: 'teaching',
+    description: 'Asignar, reemplazar y finalizar docentes de grupos y asignaturas',
+  },
+  {
+    code: PERMISSIONS.ADMISSIONS_READ,
+    module: 'admissions',
+    description: 'Consultar solicitudes de admisión y sus documentos',
+  },
+  {
+    code: PERMISSIONS.ADMISSIONS_MANAGE,
+    module: 'admissions',
+    description:
+      'Registrar y editar solicitudes, adjuntar documentos, enviarlas a revisión y matricular admitidos',
+  },
+  {
+    code: PERMISSIONS.ADMISSIONS_DECIDE,
+    module: 'admissions',
+    description: 'Aprobar, rechazar o dejar en espera solicitudes de admisión',
+  },
+  {
+    code: PERMISSIONS.PRIVACY_POLICIES_MANAGE,
+    module: 'privacy',
+    description: 'Redactar y publicar versiones de la política de tratamiento de datos',
+  },
+  {
+    code: PERMISSIONS.PRIVACY_CONSENTS_READ,
+    module: 'privacy',
+    description: 'Consultar las políticas, las autorizaciones de tratamiento y su cobertura',
+  },
+  {
+    code: PERMISSIONS.PRIVACY_CONSENTS_MANAGE,
+    module: 'privacy',
+    description: 'Registrar y revocar autorizaciones de tratamiento de datos y adjuntar su soporte',
   },
 ];
 

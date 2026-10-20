@@ -160,6 +160,34 @@ export class SchoolGroupsService {
         if (other && other.id !== id) throw AcademicErrors.codeTaken('un grupo en esta sede y año');
       }
 
+      // Con estudiantes ubicados: no se desactiva ni se reduce el cupo por debajo
+      // de la ocupación, ni se cambia de grado (la matrícula quedaría inconsistente).
+      const occupied =
+        dto.status === 'INACTIVE' ||
+        dto.capacity != null ||
+        (dto.gradeId && dto.gradeId !== before.gradeId)
+          ? await this.repository.countCurrentPlacements(id, tx)
+          : 0;
+      if (occupied > 0) {
+        if (dto.status === 'INACTIVE' && before.status === 'ACTIVE') {
+          throw AcademicErrors.inUse('el grupo', 'estudiante(s) ubicado(s)', occupied);
+        }
+        if (dto.gradeId && dto.gradeId !== before.gradeId)
+          throw AcademicErrors.groupHasStudents(occupied);
+        if (dto.capacity != null && dto.capacity < occupied)
+          throw AcademicErrors.capacityBelowOccupancy(occupied);
+      }
+
+      // Con docentes asignados tampoco: el plan de estudios depende del grado
+      // y las asignaciones quedarían en un grupo inactivo.
+      if (
+        (dto.status === 'INACTIVE' && before.status === 'ACTIVE') ||
+        (dto.gradeId && dto.gradeId !== before.gradeId)
+      ) {
+        const assigned = await this.repository.countCurrentAssignments(id, tx);
+        if (assigned > 0) throw AcademicErrors.groupHasAssignments(assigned);
+      }
+
       const after = await this.repository.updateGroup(id, dto, tx);
       const changes = diffChanges(before, after, GROUP_FIELDS);
       if (Object.keys(changes).length > 0) {

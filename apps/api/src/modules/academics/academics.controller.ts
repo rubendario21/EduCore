@@ -22,10 +22,12 @@ import {
 import { RequirePermissions } from '../access-control/authorization';
 import { type AuthContext, type ClientInfo } from '../auth/auth.types';
 import { Client, CurrentAuth } from '../auth/decorators/auth.decorators';
+import { AcademicTemplateService } from './academic-template.service';
 import { AcademicYearsService } from './academic-years.service';
 import { CatalogService } from './catalog.service';
 import {
   AcademicYearViewDto,
+  ApplyTemplateDto,
   CatalogItemViewDto,
   CreateAcademicPeriodDto,
   CreateAcademicYearDto,
@@ -195,6 +197,28 @@ export class CatalogController {
   }
 }
 
+@ApiTags('Estructura académica')
+@ApiBearerAuth()
+@Controller('academic-templates')
+export class AcademicTemplatesController {
+  constructor(private readonly templates: AcademicTemplateService) {}
+
+  @Post('colombia')
+  @RequirePermissions(MANAGE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Aplicar la plantilla colombiana (niveles, grados y áreas obligatorias). Opcional e idempotente.',
+  })
+  applyColombian(
+    @CurrentAuth() auth: AuthContext,
+    @Body() body: ApplyTemplateDto,
+    @Client() client: ClientInfo,
+  ) {
+    return this.templates.applyColombian(auth, body.dryRun ?? false, client);
+  }
+}
+
 @ApiTags('Años lectivos')
 @ApiBearerAuth()
 @Controller()
@@ -292,6 +316,19 @@ export class AcademicYearsController {
     @Client() client: ClientInfo,
   ) {
     return this.years.updatePeriod(auth, id, body, client);
+  }
+
+  @Post('academic-periods/:id/open')
+  @RequirePermissions(YEARS)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Abrir un período para registrar notas (año activo y con SIEE)' })
+  @ApiOkResponse({ type: AcademicYearViewDto })
+  openPeriod(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', uuid) id: string,
+    @Client() client: ClientInfo,
+  ) {
+    return this.years.openPeriod(auth, id, client);
   }
 
   @Delete('academic-periods/:id')

@@ -287,6 +287,22 @@ export class AcademicsRepository {
     return db.schoolGroup.update({ where: { id }, data, include: schoolGroupInclude });
   }
 
+  /** Estudiantes ubicados hoy en el grupo con matrícula vigente. */
+  countCurrentPlacements(schoolGroupId: string, db: Db) {
+    return db.groupPlacement.count({
+      where: {
+        schoolGroupId,
+        toDate: null,
+        enrollment: { status: { in: ['PRE_ENROLLED', 'ACTIVE'] } },
+      },
+    });
+  }
+
+  /** Asignaturas del grupo con docente vigente. */
+  countCurrentAssignments(schoolGroupId: string, db: Db) {
+    return db.teachingAssignment.count({ where: { schoolGroupId, toDate: null } });
+  }
+
   countOpenGroupsOfGrade(gradeId: string, db: Db) {
     return db.schoolGroup.count({
       where: { gradeId, status: 'ACTIVE', academicYear: { status: { not: 'CLOSED' } } },

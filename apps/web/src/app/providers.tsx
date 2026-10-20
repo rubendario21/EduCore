@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/features/auth/auth-context';
+import { ProfileProvider } from '@/features/auth/profile-provider';
 import { BrandingStyles } from '@/features/branding/branding-styles';
 import { ThemeProvider, useTheme } from '@/lib/theme';
 import { createQueryClient } from './query-client';
@@ -17,9 +18,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <BrandingStyles />
-          {children}
-          <ThemedToaster />
+          <ProfileProvider>
+            <BrandingStyles />
+            {children}
+            <ThemedToaster />
+          </ProfileProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

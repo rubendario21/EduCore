@@ -13,6 +13,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Alert, ErrorState, LoadingState } from '@/components/ui/feedback';
 import { useAuth } from '@/features/auth/auth-context';
+import { PeriodStatusCard } from '../components/period-status-card';
+import { GradingSchemeCard } from '@/features/grading/components/grading-scheme-card';
 import { ApiError, getErrorMessage } from '@/lib/api-client';
 import { dateField, requiredText } from '@/lib/forms';
 import { formatDate } from '@/lib/format';
@@ -240,6 +242,11 @@ export function AcademicYearPage() {
               update={(p, v) => academicsService.updatePeriod(p.id, toPeriodInput(v))}
             />
           </section>
+          <PeriodStatusCard year={year} canManage={canManage} />
+          <GradingSchemeCard
+            yearId={id}
+            editable={can(PERMISSIONS.GRADING_MANAGE) && year.status !== 'CLOSED'}
+          />
         </>
       )}
     </div>

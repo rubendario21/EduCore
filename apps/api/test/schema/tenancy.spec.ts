@@ -20,7 +20,16 @@ const NON_INSTITUTIONAL_MODELS: Record<string, string> = {
   UserSession: 'Hija de UserInstitution (institucional)',
   PasswordToken: 'Pertenece a la cuenta global (User)',
   AcademicPeriod: 'Hija de AcademicYear (institucional)',
+  GroupPlacement: 'Hija de Enrollment (institucional)',
   StudentGuardian: 'Tabla puente entre Student y Guardian (institucionales)',
+  AdmissionDocument: 'Hija de AdmissionApplication (institucional)',
+  AdmissionStatusChange: 'Hija de AdmissionApplication (institucional)',
+  DataPolicyPurpose: 'Hija de DataPolicy (institucional)',
+  DataConsentDecision: 'Hija de DataConsent (institucional)',
+  PerformanceLevel: 'Hija de GradingScheme (institucional)',
+  EvaluationComponent: 'Hija de GradingScheme (institucional)',
+  GradeRecord: 'Hija de Assessment (institucional)',
+  GradeRecordChange: 'Hija de GradeRecord (institucional)',
 };
 
 /** Campos `@unique` permitidos en modelos institucionales (identificadores no reutilizables). */
@@ -30,6 +39,10 @@ const ALLOWED_FIELD_UNIQUES: Record<string, string[]> = {
   Student: ['personId'],
   Guardian: ['personId'],
   StaffMember: ['personId'],
+  // Una matrícula proviene como máximo de una solicitud (ya es institucional).
+  AdmissionApplication: ['enrollmentId'],
+  // Un SIEE por año lectivo (el año ya es institucional).
+  GradingScheme: ['academicYearId'],
 };
 
 interface ParsedModel {

@@ -9,6 +9,7 @@ import {
 import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -312,4 +313,14 @@ export class SchoolGroupViewDto {
   @ApiProperty() campusName: string;
   @ApiProperty() shiftId: string;
   @ApiProperty() shiftName: string;
+}
+
+export class ApplyTemplateDto {
+  @ApiPropertyOptional({
+    description: 'Solo simular: muestra qué se crearía sin guardar nada',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'dryRun debe ser verdadero o falso.' })
+  dryRun?: boolean;
 }

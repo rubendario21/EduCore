@@ -164,6 +164,36 @@ export const apiClient = {
   delete: <T>(path: string, options?: RequestOptions) => request<T>('DELETE', path, options),
 };
 
+/**
+ * Descarga un archivo protegido (con el token de acceso) y lo entrega al
+ * navegador para guardarlo. Los archivos privados no se abren con un enlace
+ * directo porque el token no viaja en la URL.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const fetchBlob = async () => {
+    const response = await send('GET', path, { headers: { Accept: '*/*' } });
+    if (!response.ok) await parse(response);
+    return response;
+  };
+  let response: Response;
+  try {
+    response = await fetchBlob();
+  } catch (error) {
+    const expired = error instanceof ApiError && error.code === 'ACCESS_TOKEN_EXPIRED';
+    if (!expired || !refreshHandler || !(await refreshHandler())) throw error;
+    response = await fetchBlob();
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const name = encoded ? decodeURIComponent(encoded) : fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Mensaje apto para mostrar al usuario a partir de cualquier error. */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;

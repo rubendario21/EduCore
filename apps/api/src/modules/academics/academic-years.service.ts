@@ -404,6 +404,36 @@ export class AcademicYearsService {
     return this.get(auth, period.academicYearId);
   }
 
+  /**
+   * Abre un período para registrar actividades y notas. El año debe estar
+   * activo y tener SIEE (sin escala no hay cómo validar una nota). El cierre y
+   * la publicación se hacen en el módulo de evaluación (Fase 3C).
+   */
+  async openPeriod(
+    auth: AuthContext,
+    periodId: string,
+    client: ClientInfo,
+  ): Promise<AcademicYearViewDto> {
+    const period = await this.repository.findPeriod(auth.institutionId, periodId);
+    if (!period) throw AcademicErrors.notFound('El período');
+
+    await this.repository.transaction(async (tx) => {
+      const year = await this.requireYear(auth, period.academicYearId, tx);
+      if (year.status !== 'ACTIVE') throw AcademicErrors.yearNotActive();
+      const current = year.periods.find((p) => p.id === periodId)!;
+      if (current.status !== 'PLANNED')
+        throw AcademicErrors.invalidTransition(current.status, 'OPEN');
+      if (!(await tx.gradingScheme.findFirst({ where: { academicYearId: year.id } }))) {
+        throw AcademicErrors.gradingSchemeRequired();
+      }
+      await this.repository.updatePeriod(periodId, { status: 'OPEN' }, tx);
+      await this.record(auth, client, 'academics.period.opened', 'academic_period', periodId, tx, {
+        metadata: { academicYearId: year.id, number: current.number },
+      });
+    });
+    return this.get(auth, period.academicYearId);
+  }
+
   async deletePeriod(
     auth: AuthContext,
     periodId: string,

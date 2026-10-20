@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/lib/theme';
 import { jsonResponse } from '@/test/render';
 import { AuthProvider } from './auth-context';
+import { ProfileProvider } from './profile-provider';
 import { RedirectIfAuthenticated, RequireAuth, RequirePermission } from './components/route-guards';
 import { LoginPage } from './pages/login-page';
 import { type AuthSession } from './types';
@@ -62,7 +63,9 @@ function renderApp(
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RouterProvider router={router} />
+            <ProfileProvider>
+              <RouterProvider router={router} />
+            </ProfileProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>,

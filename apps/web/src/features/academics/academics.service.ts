@@ -105,6 +105,7 @@ export const academicsService = {
   updatePeriod: (id: string, input: Partial<PeriodInput>) =>
     apiClient.patch<AcademicYear>(`/academic-periods/${id}`, input),
   deletePeriod: (id: string) => apiClient.delete<AcademicYear>(`/academic-periods/${id}`),
+  openPeriod: (id: string) => apiClient.post<AcademicYear>(`/academic-periods/${id}/open`),
 
   groups: (filter: { academicYearId?: string }, signal?: AbortSignal) =>
     apiClient.get<SchoolGroup[]>(`/school-groups${toQuery(filter)}`, { signal }),
@@ -126,6 +127,20 @@ export const YEAR_STATUS_LABELS: Record<AcademicYearStatus, string> = {
   ACTIVE: 'Activo',
   CLOSED: 'Cerrado',
 };
+
+export const PERIOD_STATUS_LABELS: Record<AcademicPeriodStatus, string> = {
+  PLANNED: 'Programado',
+  OPEN: 'Abierto',
+  CLOSED: 'Cerrado',
+  PUBLISHED: 'Publicado',
+};
+
+export const PERIOD_STATUS_TONES = {
+  PLANNED: 'neutral',
+  OPEN: 'success',
+  CLOSED: 'warning',
+  PUBLISHED: 'primary',
+} as const satisfies Record<AcademicPeriodStatus, 'neutral' | 'success' | 'warning' | 'primary'>;
 
 export const YEAR_STATUS_TONES = {
   PLANNING: 'warning',

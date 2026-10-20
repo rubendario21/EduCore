@@ -45,6 +45,16 @@ export const UPLOAD_RULES = {
     maxBytes: 2 * 1024 * 1024,
     classification: 'INSTITUTIONAL',
   },
+  admissionDocument: {
+    allowedTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+    maxBytes: 5 * 1024 * 1024,
+    classification: 'PERSONAL',
+  },
+  consentEvidence: {
+    allowedTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+    maxBytes: 5 * 1024 * 1024,
+    classification: 'PERSONAL',
+  },
 } as const satisfies Record<string, UploadRule>;
 
 export interface IncomingFile {
@@ -122,6 +132,16 @@ export class FilesService {
     } catch {
       throw FileErrors.notFound();
     }
+  }
+
+  /**
+   * Archivo de la institución, sin reglas de acceso propias: lo usa un módulo
+   * que ya verificó el permiso sobre el registro dueño del archivo.
+   */
+  async findOwned(institutionId: string, id: string): Promise<StoredFile> {
+    const file = await this.prisma.storedFile.findFirst({ where: { id, institutionId } });
+    if (!file) throw FileErrors.notFound();
+    return file;
   }
 
   /**

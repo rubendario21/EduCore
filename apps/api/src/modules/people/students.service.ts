@@ -1,10 +1,11 @@
-import { SYSTEM_ROLES } from '@educore/shared';
+import { PERMISSIONS, SYSTEM_ROLES } from '@educore/shared';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AppException, ValidationException } from '../../common/errors/app.exception';
 import { paginated, type Paginated, toPrismaPage } from '../../common/pagination/pagination';
 import { type Prisma } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuthContext, type ClientInfo } from '../auth/auth.types';
+import { TeachingScope } from '../teaching/teaching-scope.service';
 import { UsersService } from '../users/users.service';
 import {
   type CreateStudentDto,
@@ -69,6 +70,7 @@ export class StudentsService {
     private readonly persons: PersonResolver,
     private readonly audit: AuditService,
     private readonly users: UsersService,
+    private readonly scope: TeachingScope,
   ) {}
 
   private record(
@@ -103,41 +105,57 @@ export class StudentsService {
     const { items, total } = await this.repository.listStudents(auth.institutionId, {
       search: query.search,
       status: query.status,
+      scope: await this.scope.studentWhere(auth, PERMISSIONS.STUDENTS_READ),
       ...toPrismaPage(query),
     });
     return paginated(items.map(studentView), total, query);
   }
 
   async get(auth: AuthContext, id: string): Promise<StudentView> {
+    const student = await this.repository.findVisibleStudent(
+      auth.institutionId,
+      id,
+      await this.scope.studentWhere(auth, PERMISSIONS.STUDENTS_READ),
+    );
+    if (!student) throw StudentErrors.notFound();
+    return studentView(student);
+  }
+
+  /** Resultado de una operación de gestión (no depende del alcance de lectura). */
+  private async view(auth: AuthContext, id: string): Promise<StudentView> {
     return studentView(await this.require(auth, id));
   }
 
   async create(auth: AuthContext, dto: CreateStudentDto, client: ClientInfo): Promise<StudentView> {
-    const id = await this.repository.transaction(async (tx) => {
-      const { person, reused } = await this.persons.findOrCreate(
-        auth.institutionId,
-        dto.person,
-        tx,
-      );
-      if (person.student) throw StudentErrors.alreadyExists();
-      if (dto.code && (await this.repository.findStudentByCode(auth.institutionId, dto.code, tx))) {
-        throw StudentErrors.codeTaken();
-      }
-      const student = await this.repository.createStudent(
-        { institutionId: auth.institutionId, personId: person.id, code: dto.code ?? null },
-        tx,
-      );
-      await this.record(
-        auth,
-        client,
-        'students.student.created',
-        student.id,
-        { personId: person.id, reusedPerson: reused },
-        tx,
-      );
-      return student.id;
-    });
-    return this.get(auth, id);
+    const id = await this.repository.transaction((tx) => this.createWithin(auth, dto, client, tx));
+    return this.view(auth, id);
+  }
+
+  /** Registra el estudiante dentro de una transacción existente (p. ej. al matricular un admitido). */
+  async createWithin(
+    auth: AuthContext,
+    dto: CreateStudentDto,
+    client: ClientInfo,
+    tx: Tx,
+  ): Promise<string> {
+    const { person, reused } = await this.persons.findOrCreate(auth.institutionId, dto.person, tx);
+    if (person.student) throw StudentErrors.alreadyExists();
+    if (dto.code && (await this.repository.findStudentByCode(auth.institutionId, dto.code, tx))) {
+      throw StudentErrors.codeTaken();
+    }
+    const student = await this.repository.createStudent(
+      { institutionId: auth.institutionId, personId: person.id, code: dto.code ?? null },
+      tx,
+    );
+    await this.record(
+      auth,
+      client,
+      'students.student.created',
+      student.id,
+      { personId: person.id, reusedPerson: reused },
+      tx,
+    );
+    return student.id;
   }
 
   async update(
@@ -180,7 +198,7 @@ export class StudentsService {
         tx,
       );
     });
-    return this.get(auth, id);
+    return this.view(auth, id);
   }
 
   // --- Acudientes del estudiante -------------------------------------------
@@ -191,6 +209,20 @@ export class StudentsService {
     dto: LinkGuardianDto,
     client: ClientInfo,
   ): Promise<StudentView> {
+    await this.repository.transaction((tx) =>
+      this.linkGuardianWithin(auth, studentId, dto, client, tx),
+    );
+    return this.view(auth, studentId);
+  }
+
+  /** Vincula un acudiente dentro de una transacción existente. */
+  async linkGuardianWithin(
+    auth: AuthContext,
+    studentId: string,
+    dto: LinkGuardianDto,
+    client: ClientInfo,
+    tx: Tx,
+  ): Promise<void> {
     if (!dto.guardianId && !dto.person) {
       throw new ValidationException([
         {
@@ -199,60 +231,57 @@ export class StudentsService {
         },
       ]);
     }
-    await this.repository.transaction(async (tx) => {
-      const student = await this.repository.lockStudent(auth.institutionId, studentId, tx);
-      if (!student) throw StudentErrors.notFound();
+    const student = await this.repository.lockStudent(auth.institutionId, studentId, tx);
+    if (!student) throw StudentErrors.notFound();
 
-      let guardianId = dto.guardianId;
-      if (guardianId) {
-        if (!(await this.repository.findGuardian(auth.institutionId, guardianId, tx)))
-          throw StudentErrors.guardianNotFound();
-      } else {
-        // Acudiente nuevo, o persona existente (p. ej. una docente) que pasa a ser acudiente.
-        const { person } = await this.persons.findOrCreate(auth.institutionId, dto.person!, tx);
-        guardianId =
-          person.guardian?.id ??
-          (
-            await this.repository.createGuardian(
-              {
-                institutionId: auth.institutionId,
-                personId: person.id,
-                occupation: dto.occupation ?? null,
-              },
-              tx,
-            )
-          ).id;
-      }
+    let guardianId = dto.guardianId;
+    if (guardianId) {
+      if (!(await this.repository.findGuardian(auth.institutionId, guardianId, tx)))
+        throw StudentErrors.guardianNotFound();
+    } else {
+      // Acudiente nuevo, o persona existente (p. ej. una docente) que pasa a ser acudiente.
+      const { person } = await this.persons.findOrCreate(auth.institutionId, dto.person!, tx);
+      guardianId =
+        person.guardian?.id ??
+        (
+          await this.repository.createGuardian(
+            {
+              institutionId: auth.institutionId,
+              personId: person.id,
+              occupation: dto.occupation ?? null,
+            },
+            tx,
+          )
+        ).id;
+    }
 
-      const guardian = await this.repository.findGuardian(auth.institutionId, guardianId, tx);
-      if (guardian!.personId === student.personId) throw StudentErrors.selfLink();
-      if (student.guardians.some((g) => g.guardianId === guardianId))
-        throw StudentErrors.alreadyLinked();
+    const guardian = await this.repository.findGuardian(auth.institutionId, guardianId, tx);
+    if (guardian!.personId === student.personId) throw StudentErrors.selfLink();
+    if (student.guardians.some((g) => g.guardianId === guardianId))
+      throw StudentErrors.alreadyLinked();
 
-      // El primer acudiente es el principal; marcar uno como principal desplaza al anterior.
-      const isPrimary = student.guardians.length === 0 || dto.isPrimary === true;
-      if (isPrimary) await this.repository.clearPrimary(studentId, tx);
-      await this.repository.createLink(
-        {
-          studentId,
-          guardianId,
-          relationship: dto.relationship,
-          isPrimary,
-          isLegalRepresentative: dto.isLegalRepresentative ?? false,
-          livesWithStudent: dto.livesWithStudent ?? false,
-        },
-        tx,
-      );
-      await this.record(
-        auth,
-        client,
-        'students.guardian.linked',
+    // El primer acudiente es el principal; marcar uno como principal desplaza al anterior.
+    const isPrimary = student.guardians.length === 0 || dto.isPrimary === true;
+    if (isPrimary) await this.repository.clearPrimary(studentId, tx);
+    await this.repository.createLink(
+      {
         studentId,
-        { guardianId, relationship: dto.relationship, isPrimary },
-        tx,
-      );
-    });
-    return this.get(auth, studentId);
+        guardianId,
+        relationship: dto.relationship,
+        isPrimary,
+        isLegalRepresentative: dto.isLegalRepresentative ?? false,
+        livesWithStudent: dto.livesWithStudent ?? false,
+      },
+      tx,
+    );
+    await this.record(
+      auth,
+      client,
+      'students.guardian.linked',
+      studentId,
+      { guardianId, relationship: dto.relationship, isPrimary },
+      tx,
+    );
   }
 
   async updateGuardianLink(
@@ -281,7 +310,7 @@ export class StudentsService {
         tx,
       );
     });
-    return this.get(auth, studentId);
+    return this.view(auth, studentId);
   }
 
   async unlinkGuardian(
@@ -306,7 +335,7 @@ export class StudentsService {
         tx,
       );
     });
-    return this.get(auth, studentId);
+    return this.view(auth, studentId);
   }
 
   /** Da acceso al portal al estudiante (rol Estudiante) y envía la activación. */
@@ -315,15 +344,15 @@ export class StudentsService {
     id: string,
     email: string,
     client: ClientInfo,
-  ): Promise<StudentView> {
+  ): Promise<StudentView & { activationEmail: 'SENT' | 'FAILED' | null }> {
     const student = await this.require(auth, id);
-    await this.users.grantAccessToPerson(
+    const account = await this.users.grantAccessToPerson(
       auth,
       student.personId,
       email,
       [SYSTEM_ROLES.STUDENT],
       client,
     );
-    return this.get(auth, id);
+    return { ...(await this.view(auth, id)), activationEmail: account.activationEmail ?? null };
   }
 }

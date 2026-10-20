@@ -32,3 +32,16 @@ export function Checkbox({ className, ...props }: Omit<ComponentProps<'input'>, 
     />
   );
 }
+
+export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
+  return (
+    <textarea
+      className={cn(
+        controlClasses,
+        'min-h-24 px-3 py-2 placeholder:text-muted-foreground',
+        className,
+      )}
+      {...props}
+    />
+  );
+}

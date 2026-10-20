@@ -1,7 +1,7 @@
 import { PERMISSIONS, SYSTEM_ROLES } from '@educore/shared';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MailService } from '../src/infrastructure/mail/mail.service';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createTestApp } from './setup/create-test-app';
@@ -59,6 +59,8 @@ describe('Gestión de usuarios (integración)', () => {
 
     // Gestor de usuarios: puede administrar cuentas, pero no tiene permisos
     // de administración institucional (no puede crear ni gestionar administradores).
+    // Cubre los permisos del rol Docente (con ALL, que incluye ASSIGNED): así
+    // puede crear docentes, pero no administradores.
     await seedCustomRole(app, institutionId, 'USER_MANAGER', [
       PERMISSIONS.USERS_READ,
       PERMISSIONS.USERS_CREATE,
@@ -66,6 +68,11 @@ describe('Gestión de usuarios (integración)', () => {
       PERMISSIONS.USERS_STATUS,
       PERMISSIONS.USERS_ROLES_ASSIGN,
       PERMISSIONS.ACADEMICS_READ,
+      PERMISSIONS.TEACHING_READ,
+      PERMISSIONS.STUDENTS_READ,
+      PERMISSIONS.ENROLLMENTS_READ,
+      PERMISSIONS.GRADES_READ,
+      PERMISSIONS.GRADES_MANAGE,
     ]);
 
     const seed = (email: string, roleCode: string, firstNames: string) =>
@@ -114,6 +121,7 @@ describe('Gestión de usuarios (integración)', () => {
         firstNames: 'Carlos Andrés',
         roles: [{ code: 'TEACHER' }],
         lastLoginAt: null,
+        activationEmail: 'SENT',
       });
       expect(JSON.stringify(res.body)).not.toMatch(/passwordHash|argon2/);
 
@@ -421,6 +429,28 @@ describe('Gestión de usuarios (integración)', () => {
       const active = await as(tokens.admin).post(`/api/v1/users/${ids.teacher}/access-email`);
       expect(active.body).toEqual({ sent: 'RESET' });
       expect(mail.outbox.at(-1)!.text).toContain('/restablecer-contrasena?token=');
+    });
+
+    it('si el correo no sale, la cuenta se crea igual y se informa; el reenvío falla con un error claro', async () => {
+      const spy = vi.spyOn(mail, 'send').mockRejectedValue(new Error('SMTP caído'));
+      try {
+        const created = await as(tokens.admin).post('/api/v1/users', newUser());
+        expect(created.status).toBe(201);
+        expect(created.body).toMatchObject({ status: 'INVITED', activationEmail: 'FAILED' });
+
+        const resend = await as(tokens.admin).post(`/api/v1/users/${created.body.id}/access-email`);
+        expect(resend.status).toBe(502);
+        expect(resend.body.error.code).toBe('MAIL_DELIVERY_FAILED');
+      } finally {
+        spy.mockRestore();
+      }
+      // Con el correo restablecido, el reenvío funciona.
+      const member = await prisma.user.findUniqueOrThrow({
+        where: { email: 'nuevo.docente@prueba.edu.co' },
+      });
+      expect((await as(tokens.admin).post(`/api/v1/users/${member.id}/access-email`)).status).toBe(
+        202,
+      );
     });
   });
 

@@ -19,15 +19,17 @@ type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<void>;
+  /** Inicia sesión y devuelve el usuario autenticado. */
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** Vuelve a cargar el usuario (p. ej. tras cambiar sus roles). */
   reloadUser: () => Promise<void>;
   /**
-   * Indica si el usuario tiene el permiso. Solo decide qué mostrar en la web:
-   * la API verifica los permisos en cada petición.
+   * Indica si el usuario tiene el permiso (con `scope: 'ALL'`, sobre toda la
+   * institución y no solo lo asignado). Solo decide qué mostrar en la web: la
+   * API verifica los permisos en cada petición.
    */
-  can: (permission: PermissionCode) => boolean;
+  can: (permission: PermissionCode, scope?: 'ALL') => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -96,7 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      applySession(await authService.login(email, password));
+      const session = await authService.login(email, password);
+      applySession(session);
+      return session.user;
     },
     [applySession],
   );
@@ -114,7 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const can = useCallback(
-    (permission: PermissionCode) => user?.permissions.some((p) => p.code === permission) ?? false,
+    (permission: PermissionCode, scope?: 'ALL') =>
+      user?.permissions.some(
+        (p) => p.code === permission && (!scope || p.scopes.includes(scope)),
+      ) ?? false,
     [user],
   );
 

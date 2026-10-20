@@ -60,12 +60,50 @@ export const AcademicErrors = {
       { problems },
     ),
 
+  yearNotActive: () =>
+    new AppException(
+      HttpStatus.CONFLICT,
+      'ACADEMIC_YEAR_NOT_ACTIVE',
+      'El año lectivo debe estar activo para abrir sus períodos.',
+    ),
+
+  gradingSchemeRequired: () =>
+    new AppException(
+      HttpStatus.CONFLICT,
+      'GRADING_SCHEME_NOT_DEFINED',
+      'Configura el SIEE del año (escala y niveles de desempeño) antes de abrir un período.',
+    ),
+
   invalidTransition: (from: string, to: string) =>
     new AppException(
       HttpStatus.CONFLICT,
       'INVALID_STATUS_TRANSITION',
       `No se puede pasar de ${from} a ${to}.`,
       { from, to },
+    ),
+
+  groupHasStudents: (count: number) =>
+    new AppException(
+      HttpStatus.CONFLICT,
+      'GROUP_HAS_STUDENTS',
+      `El grupo tiene ${count} estudiante(s) ubicado(s): no se puede cambiar de grado.`,
+      { count },
+    ),
+
+  groupHasAssignments: (count: number) =>
+    new AppException(
+      HttpStatus.CONFLICT,
+      'GROUP_HAS_ASSIGNMENTS',
+      `El grupo tiene ${count} asignatura(s) con docente vigente: finaliza esas asignaciones primero.`,
+      { count },
+    ),
+
+  capacityBelowOccupancy: (count: number) =>
+    new AppException(
+      HttpStatus.CONFLICT,
+      'CAPACITY_BELOW_OCCUPANCY',
+      `El cupo no puede ser menor que los ${count} estudiante(s) ubicados en el grupo.`,
+      { count },
     ),
 
   concurrentChange: () =>

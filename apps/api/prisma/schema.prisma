@@ -124,7 +124,104 @@ enum StaffType {
   @@map("staff_type")
 }
 
+enum EnrollmentStatus {
+  /// Prematrícula: reserva el cupo, aún no formalizada.
+  PRE_ENROLLED
+  ACTIVE
+  WITHDRAWN
+  TRANSFERRED
+  /// El año terminó con el estudiante matriculado.
+  COMPLETED
+  /// Anulada: prematrícula registrada por error (se conserva, no se borra).
+  CANCELLED
+
+  @@map("enrollment_status")
+}
+
+enum WithdrawalReason {
+  VOLUNTARY
+  ACADEMIC
+  DISCIPLINARY
+  HEALTH
+  RELOCATION
+  ECONOMIC
+  OTHER
+
+  @@map("withdrawal_reason")
+}
+
 /// Sensibilidad de un archivo: define quién puede descargarlo.
+enum AdmissionStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  WAITLISTED
+  APPROVED
+  REJECTED
+  ENROLLED
+  /// La familia desistió de la solicitud.
+  WITHDRAWN
+
+  @@map("admission_status")
+}
+
+enum AdmissionDocumentType {
+  BIRTH_CERTIFICATE
+  IDENTITY_DOCUMENT
+  REPORT_CARD
+  PHOTO
+  GUARDIAN_IDENTITY
+  OTHER
+
+  @@map("admission_document_type")
+}
+
+enum DataPolicyStatus {
+  DRAFT
+  /// Publicada: su contenido y sus finalidades ya no se modifican.
+  PUBLISHED
+
+  @@map("data_policy_status")
+}
+
+/// Quién otorga la autorización (Ley 1581, art. 7: los datos de menores los
+/// autoriza su representante legal).
+enum ConsentAuthorizerRole {
+  LEGAL_REPRESENTATIVE
+  /// El propio titular, cuando es mayor de edad.
+  TITULAR
+
+  @@map("consent_authorizer_role")
+}
+
+/// Medio por el que se obtuvo la autorización (Decreto 1377 de 2013, art. 7).
+enum ConsentMethod {
+  WRITTEN
+  ELECTRONIC
+  EMAIL
+  RECORDED_CALL
+  OTHER
+
+  @@map("consent_method")
+}
+
+enum RoundingMode {
+  /// Redondeo al más cercano (0,5 hacia arriba).
+  HALF_UP
+  /// Se descartan los decimales sobrantes.
+  TRUNCATE
+
+  @@map("rounding_mode")
+}
+
+/// Unidad que cuenta para la promoción: áreas (lo usual en el SIEE) o asignaturas.
+enum PromotionUnit {
+  AREA
+  SUBJECT
+
+  @@map("promotion_unit")
+}
+
 enum FileClassification {
   /// Material institucional (logo, documentos públicos de la institución).
   INSTITUTIONAL
@@ -160,23 +257,31 @@ model Institution {
   createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  settings        InstitutionSettings?
-  campuses        Campus[]
-  shifts          Shift[]
-  people          Person[]
-  memberships     UserInstitution[]
-  roles           Role[]
-  auditLogs       AuditLog[]
-  academicYears   AcademicYear[]
-  educationLevels EducationLevel[]
-  grades          Grade[]
-  schoolGroups    SchoolGroup[]
-  subjectAreas    SubjectArea[]
-  subjects        Subject[]
-  storedFiles     StoredFile[]
-  students        Student[]
-  guardians       Guardian[]
-  staffMembers    StaffMember[]
+  settings            InstitutionSettings?
+  campuses            Campus[]
+  shifts              Shift[]
+  people              Person[]
+  memberships         UserInstitution[]
+  roles               Role[]
+  auditLogs           AuditLog[]
+  academicYears       AcademicYear[]
+  educationLevels     EducationLevel[]
+  grades              Grade[]
+  schoolGroups        SchoolGroup[]
+  subjectAreas        SubjectArea[]
+  subjects            Subject[]
+  storedFiles         StoredFile[]
+  enrollments         Enrollment[]
+  students            Student[]
+  guardians           Guardian[]
+  staffMembers        StaffMember[]
+  curriculum          CurriculumSubject[]
+  teachingAssignments TeachingAssignment[]
+  admissions          AdmissionApplication[]
+  dataPolicies        DataPolicy[]
+  dataConsents        DataConsent[]
+  gradingSchemes      GradingScheme[]
+  assessments         Assessment[]
 
   @@map("institution")
 }
@@ -244,17 +349,17 @@ model Shift {
 /// Cuenta de acceso GLOBAL (una por correo). Los datos personales viven en
 /// Person, que es institucional; UserInstitution une ambos.
 model User {
-  id                  String    @id @default(uuid(7)) @db.Uuid
-  email               String    @unique @db.Citext
+  id                String    @id @default(uuid(7)) @db.Uuid
+  email             String    @unique @db.Citext
   /// Argon2id. Nulo mientras la cuenta no se ha activado.
-  passwordHash        String?   @map("password_hash") @db.VarChar(255)
-  isActive            Boolean   @default(true) @map("is_active")
-  failedLoginCount    Int       @default(0) @map("failed_login_count")
-  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
-  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz(6)
-  passwordChangedAt   DateTime? @map("password_changed_at") @db.Timestamptz(6)
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  passwordHash      String?   @map("password_hash") @db.VarChar(255)
+  isActive          Boolean   @default(true) @map("is_active")
+  failedLoginCount  Int       @default(0) @map("failed_login_count")
+  lockedUntil       DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt       DateTime? @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   memberships    UserInstitution[]
   sessions       UserSession[]
@@ -282,11 +387,12 @@ model Person {
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution Institution      @relation(fields: [institutionId], references: [id])
-  membership  UserInstitution?
-  student     Student?
-  guardian    Guardian?
-  staff       StaffMember?
+  institution       Institution      @relation(fields: [institutionId], references: [id])
+  membership        UserInstitution?
+  student           Student?
+  guardian          Guardian?
+  staff             StaffMember?
+  dataConsentsGiven DataConsent[]
 
   @@unique([institutionId, documentType, documentNumber])
   @@index([institutionId, lastNames, firstNames])
@@ -455,9 +561,13 @@ model AcademicYear {
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution  Institution      @relation(fields: [institutionId], references: [id])
-  periods      AcademicPeriod[]
-  schoolGroups SchoolGroup[]
+  institution   Institution            @relation(fields: [institutionId], references: [id])
+  periods       AcademicPeriod[]
+  schoolGroups  SchoolGroup[]
+  enrollments   Enrollment[]
+  curriculum    CurriculumSubject[]
+  admissions    AdmissionApplication[]
+  gradingScheme GradingScheme?
 
   @@unique([institutionId, year])
   @@map("academic_year")
@@ -476,6 +586,7 @@ model AcademicPeriod {
   updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  assessments  Assessment[]
 
   @@unique([academicYearId, number])
   @@map("academic_period")
@@ -509,9 +620,12 @@ model Grade {
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution    Institution    @relation(fields: [institutionId], references: [id])
-  educationLevel EducationLevel @relation(fields: [educationLevelId], references: [id])
+  institution    Institution            @relation(fields: [institutionId], references: [id])
+  educationLevel EducationLevel         @relation(fields: [educationLevelId], references: [id])
   schoolGroups   SchoolGroup[]
+  enrollments    Enrollment[]
+  curriculum     CurriculumSubject[]
+  admissions     AdmissionApplication[]
 
   @@unique([institutionId, code])
   @@index([educationLevelId])
@@ -532,11 +646,14 @@ model SchoolGroup {
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution  Institution  @relation(fields: [institutionId], references: [id])
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-  grade        Grade        @relation(fields: [gradeId], references: [id])
-  campus       Campus       @relation(fields: [campusId], references: [id])
-  shift        Shift        @relation(fields: [shiftId], references: [id])
+  institution  Institution          @relation(fields: [institutionId], references: [id])
+  academicYear AcademicYear         @relation(fields: [academicYearId], references: [id])
+  grade        Grade                @relation(fields: [gradeId], references: [id])
+  campus       Campus               @relation(fields: [campusId], references: [id])
+  shift        Shift                @relation(fields: [shiftId], references: [id])
+  placements   GroupPlacement[]
+  assignments  TeachingAssignment[]
+  assessments  Assessment[]
 
   @@unique([institutionId, academicYearId, campusId, code])
   @@index([academicYearId, gradeId])
@@ -569,8 +686,11 @@ model Subject {
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution Institution @relation(fields: [institutionId], references: [id])
-  subjectArea SubjectArea @relation(fields: [subjectAreaId], references: [id])
+  institution     Institution          @relation(fields: [institutionId], references: [id])
+  subjectArea     SubjectArea          @relation(fields: [subjectAreaId], references: [id])
+  curriculum      CurriculumSubject[]
+  assignments     TeachingAssignment[]
+  assessmentsList Assessment[]
 
   @@unique([institutionId, code])
   @@index([subjectAreaId])
@@ -597,8 +717,10 @@ model StoredFile {
   uploadedByUserId String?            @map("uploaded_by_user_id") @db.Uuid
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  institution     Institution           @relation(fields: [institutionId], references: [id])
-  logoOfSettings  InstitutionSettings[]
+  institution        Institution           @relation(fields: [institutionId], references: [id])
+  logoOfSettings     InstitutionSettings[]
+  admissionDocuments AdmissionDocument[]
+  consentEvidence    DataConsent[]
 
   @@unique([institutionId, storageKey])
   @@index([institutionId, createdAt(sort: Desc)])
@@ -620,9 +742,12 @@ model Student {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution Institution       @relation(fields: [institutionId], references: [id])
-  person      Person            @relation(fields: [personId], references: [id])
-  guardians   StudentGuardian[]
+  institution  Institution            @relation(fields: [institutionId], references: [id])
+  person       Person                 @relation(fields: [personId], references: [id])
+  guardians    StudentGuardian[]
+  enrollments  Enrollment[]
+  admissions   AdmissionApplication[]
+  dataConsents DataConsent[]
 
   @@unique([institutionId, code])
   @@index([institutionId, status])
@@ -681,9 +806,413 @@ model StaffMember {
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  institution Institution @relation(fields: [institutionId], references: [id])
-  person      Person      @relation(fields: [personId], references: [id])
+  institution Institution          @relation(fields: [institutionId], references: [id])
+  person      Person               @relation(fields: [personId], references: [id])
+  assignments TeachingAssignment[]
 
   @@index([institutionId, staffType, status])
   @@map("staff_member")
+}
+
+// ============================================================================
+// Matrícula
+// ============================================================================
+
+/// Matrícula de un estudiante en un año lectivo y un grado. No se borra: el
+/// retiro, el traslado y la anulación son estados con fecha y motivo.
+/// Una sola matrícula vigente (PRE_ENROLLED o ACTIVE) por estudiante y año
+/// (índice único parcial en la migración).
+model Enrollment {
+  id                   String            @id @default(uuid(7)) @db.Uuid
+  institutionId        String            @map("institution_id") @db.Uuid
+  studentId            String            @map("student_id") @db.Uuid
+  academicYearId       String            @map("academic_year_id") @db.Uuid
+  gradeId              String            @map("grade_id") @db.Uuid
+  status               EnrollmentStatus  @default(PRE_ENROLLED)
+  enrolledOn           DateTime          @map("enrolled_on") @db.Date
+  endedOn              DateTime?         @map("ended_on") @db.Date
+  withdrawalReason     WithdrawalReason? @map("withdrawal_reason")
+  endDetail            String?           @map("end_detail") @db.VarChar(500)
+  /// Matrícula del año anterior de la que proviene (renovación).
+  previousEnrollmentId String?           @map("previous_enrollment_id") @db.Uuid
+  version              Int               @default(0)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution        Institution           @relation(fields: [institutionId], references: [id])
+  student            Student               @relation(fields: [studentId], references: [id])
+  academicYear       AcademicYear          @relation(fields: [academicYearId], references: [id])
+  grade              Grade                 @relation(fields: [gradeId], references: [id])
+  previousEnrollment Enrollment?           @relation("Renewal", fields: [previousEnrollmentId], references: [id])
+  renewals           Enrollment[]          @relation("Renewal")
+  placements         GroupPlacement[]
+  admission          AdmissionApplication?
+  gradeRecords       GradeRecord[]
+
+  @@index([institutionId, academicYearId, status])
+  @@index([studentId])
+  @@map("enrollment")
+}
+
+/// Ubicación de una matrícula en un grupo, con vigencia [from_date, to_date).
+/// Un cambio de grupo cierra la ubicación vigente y abre otra: el historial
+/// no se pierde. Una sola ubicación abierta por matrícula (índice parcial).
+model GroupPlacement {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  enrollmentId  String    @map("enrollment_id") @db.Uuid
+  schoolGroupId String    @map("school_group_id") @db.Uuid
+  fromDate      DateTime  @map("from_date") @db.Date
+  toDate        DateTime? @map("to_date") @db.Date
+  reason        String?   @db.VarChar(300)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  enrollment  Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  schoolGroup SchoolGroup @relation(fields: [schoolGroupId], references: [id])
+
+  @@index([enrollmentId])
+  @@index([schoolGroupId, toDate])
+  @@map("group_placement")
+}
+
+/// Plan de estudios: asignaturas que se dictan en un grado durante un año
+/// lectivo, con su intensidad horaria semanal.
+model CurriculumSubject {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  institutionId  String   @map("institution_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  gradeId        String   @map("grade_id") @db.Uuid
+  subjectId      String   @map("subject_id") @db.Uuid
+  /// Horas semanales de la asignatura en el grado.
+  weeklyHours    Int      @map("weekly_hours")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution  Institution  @relation(fields: [institutionId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  grade        Grade        @relation(fields: [gradeId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+
+  @@unique([institutionId, academicYearId, gradeId, subjectId])
+  @@index([academicYearId, gradeId])
+  @@map("curriculum_subject")
+}
+
+/// Asignación académica: qué docente dicta una asignatura en un grupo y desde
+/// cuándo. Un reemplazo cierra la asignación vigente (to_date) y abre otra.
+model TeachingAssignment {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  institutionId String    @map("institution_id") @db.Uuid
+  schoolGroupId String    @map("school_group_id") @db.Uuid
+  subjectId     String    @map("subject_id") @db.Uuid
+  staffMemberId String    @map("staff_member_id") @db.Uuid
+  fromDate      DateTime  @map("from_date") @db.Date
+  /// Fin de la asignación (exclusivo); null mientras está vigente.
+  toDate        DateTime? @map("to_date") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution Institution @relation(fields: [institutionId], references: [id])
+  schoolGroup SchoolGroup @relation(fields: [schoolGroupId], references: [id])
+  subject     Subject     @relation(fields: [subjectId], references: [id])
+  staffMember StaffMember @relation(fields: [staffMemberId], references: [id])
+
+  @@index([staffMemberId, toDate])
+  @@index([schoolGroupId, subjectId])
+  @@map("teaching_assignment")
+}
+
+/// Solicitud de admisión. Los datos del aspirante y de su acudiente se guardan
+/// en la solicitud: solo se convierten en estudiante y acudiente al matricular,
+/// así una solicitud rechazada no deja perfiles en la comunidad educativa.
+model AdmissionApplication {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  institutionId  String          @map("institution_id") @db.Uuid
+  academicYearId String          @map("academic_year_id") @db.Uuid
+  /// Consecutivo por año lectivo (ADM-2027-0001).
+  number         Int
+  gradeId        String          @map("grade_id") @db.Uuid
+  status         AdmissionStatus @default(DRAFT)
+
+  applicantDocumentType   DocumentType @map("applicant_document_type")
+  applicantDocumentNumber String       @map("applicant_document_number") @db.VarChar(30)
+  applicantFirstNames     String       @map("applicant_first_names") @db.VarChar(120)
+  applicantLastNames      String       @map("applicant_last_names") @db.VarChar(120)
+  applicantBirthDate      DateTime?    @map("applicant_birth_date") @db.Date
+  previousSchool          String?      @map("previous_school") @db.VarChar(200)
+
+  guardianDocumentType   DocumentType?         @map("guardian_document_type")
+  guardianDocumentNumber String?               @map("guardian_document_number") @db.VarChar(30)
+  guardianFirstNames     String?               @map("guardian_first_names") @db.VarChar(120)
+  guardianLastNames      String?               @map("guardian_last_names") @db.VarChar(120)
+  guardianRelationship   GuardianRelationship? @map("guardian_relationship")
+  guardianEmail          String?               @map("guardian_email") @db.VarChar(254)
+  guardianPhone          String?               @map("guardian_phone") @db.VarChar(30)
+
+  notes        String?   @db.VarChar(1000)
+  /// Motivo de la última decisión (obligatorio al rechazar).
+  decisionNote String?   @map("decision_note") @db.VarChar(1000)
+  decidedAt    DateTime? @map("decided_at") @db.Timestamptz(6)
+  submittedAt  DateTime? @map("submitted_at") @db.Timestamptz(6)
+  studentId    String?   @map("student_id") @db.Uuid
+  enrollmentId String?   @unique @map("enrollment_id") @db.Uuid
+  version      Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution  Institution             @relation(fields: [institutionId], references: [id])
+  academicYear AcademicYear            @relation(fields: [academicYearId], references: [id])
+  grade        Grade                   @relation(fields: [gradeId], references: [id])
+  student      Student?                @relation(fields: [studentId], references: [id])
+  enrollment   Enrollment?             @relation(fields: [enrollmentId], references: [id])
+  documents    AdmissionDocument[]
+  history      AdmissionStatusChange[]
+
+  @@unique([institutionId, academicYearId, number])
+  @@index([institutionId, academicYearId, status])
+  @@map("admission_application")
+}
+
+/// Documento adjunto a una solicitud. Se retira sin borrarse (removed_at).
+model AdmissionDocument {
+  id            String                @id @default(uuid(7)) @db.Uuid
+  applicationId String                @map("application_id") @db.Uuid
+  documentType  AdmissionDocumentType @map("document_type")
+  storedFileId  String                @map("stored_file_id") @db.Uuid
+  removedAt     DateTime?             @map("removed_at") @db.Timestamptz(6)
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  application AdmissionApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  storedFile  StoredFile           @relation(fields: [storedFileId], references: [id])
+
+  @@index([applicationId])
+  @@map("admission_document")
+}
+
+/// Historial de estados de una solicitud (además del registro de auditoría).
+model AdmissionStatusChange {
+  id              String           @id @default(uuid(7)) @db.Uuid
+  applicationId   String           @map("application_id") @db.Uuid
+  fromStatus      AdmissionStatus? @map("from_status")
+  toStatus        AdmissionStatus  @map("to_status")
+  note            String?          @db.VarChar(1000)
+  changedByUserId String?          @map("changed_by_user_id") @db.Uuid
+  changedAt       DateTime         @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  application AdmissionApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, changedAt])
+  @@map("admission_status_change")
+}
+
+/// Versión de la política de tratamiento de datos personales (Ley 1581 de 2012).
+model DataPolicy {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  institutionId String           @map("institution_id") @db.Uuid
+  /// Identificador visible de la versión (p. ej. "2027-1").
+  version       String           @db.VarChar(20)
+  title         String           @db.VarChar(200)
+  content       String
+  effectiveFrom DateTime         @map("effective_from") @db.Date
+  status        DataPolicyStatus @default(DRAFT)
+  publishedAt   DateTime?        @map("published_at") @db.Timestamptz(6)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution Institution         @relation(fields: [institutionId], references: [id])
+  purposes    DataPolicyPurpose[]
+  consents    DataConsent[]
+
+  @@unique([institutionId, version])
+  @@map("data_policy")
+}
+
+/// Finalidad del tratamiento que la política somete a autorización.
+model DataPolicyPurpose {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  policyId    String  @map("policy_id") @db.Uuid
+  code        String  @db.VarChar(30)
+  name        String  @db.VarChar(150)
+  description String? @db.VarChar(1000)
+  /// Necesaria para prestar el servicio educativo (informativo: la decisión es del titular).
+  required    Boolean @default(false)
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  policy    DataPolicy            @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  decisions DataConsentDecision[]
+
+  @@unique([policyId, code])
+  @@map("data_policy_purpose")
+}
+
+/// Autorización de tratamiento de los datos de un estudiante. No se modifica
+/// ni se borra: se revoca (y queda el registro de la revocación).
+model DataConsent {
+  id                 String                @id @default(uuid(7)) @db.Uuid
+  institutionId      String                @map("institution_id") @db.Uuid
+  studentId          String                @map("student_id") @db.Uuid
+  policyId           String                @map("policy_id") @db.Uuid
+  authorizerPersonId String                @map("authorizer_person_id") @db.Uuid
+  authorizerRole     ConsentAuthorizerRole @map("authorizer_role")
+  method             ConsentMethod
+  consentedOn        DateTime              @map("consented_on") @db.Date
+  notes              String?               @db.VarChar(1000)
+  evidenceFileId     String?               @map("evidence_file_id") @db.Uuid
+  recordedByUserId   String?               @map("recorded_by_user_id") @db.Uuid
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedOn          DateTime?             @map("revoked_on") @db.Date
+  revocationReason   String?               @map("revocation_reason") @db.VarChar(1000)
+  revokedByUserId    String?               @map("revoked_by_user_id") @db.Uuid
+  revokedAt          DateTime?             @map("revoked_at") @db.Timestamptz(6)
+
+  institution  Institution           @relation(fields: [institutionId], references: [id])
+  student      Student               @relation(fields: [studentId], references: [id])
+  policy       DataPolicy            @relation(fields: [policyId], references: [id])
+  authorizer   Person                @relation(fields: [authorizerPersonId], references: [id])
+  evidenceFile StoredFile?           @relation(fields: [evidenceFileId], references: [id])
+  decisions    DataConsentDecision[]
+
+  @@index([institutionId, policyId])
+  @@index([studentId])
+  @@map("data_consent")
+}
+
+/// Decisión del titular sobre cada finalidad (autoriza o no).
+model DataConsentDecision {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  consentId String  @map("consent_id") @db.Uuid
+  purposeId String  @map("purpose_id") @db.Uuid
+  granted   Boolean
+
+  consent DataConsent       @relation(fields: [consentId], references: [id], onDelete: Restrict)
+  purpose DataPolicyPurpose @relation(fields: [purposeId], references: [id])
+
+  @@unique([consentId, purposeId])
+  @@map("data_consent_decision")
+}
+
+/// Sistema Institucional de Evaluación (SIEE) de un año lectivo (Decreto 1290
+/// de 2009). Cada institución lo define; un cambio aplica a un año nuevo.
+model GradingScheme {
+  id                    String        @id @default(uuid(7)) @db.Uuid
+  institutionId         String        @map("institution_id") @db.Uuid
+  academicYearId        String        @unique @map("academic_year_id") @db.Uuid
+  minScore              Decimal       @map("min_score") @db.Decimal(6, 2)
+  maxScore              Decimal       @map("max_score") @db.Decimal(6, 2)
+  /// Decimales de las notas (0, 1 o 2).
+  decimals              Int
+  passingScore          Decimal       @map("passing_score") @db.Decimal(6, 2)
+  rounding              RoundingMode  @default(HALF_UP)
+  promotionUnit         PromotionUnit @default(AREA) @map("promotion_unit")
+  /// Máximo de áreas (o asignaturas) reprobadas para ser promovido; null = sin esta regla.
+  maxFailedForPromotion Int?          @map("max_failed_for_promotion")
+  /// Asistencia mínima (%) para aprobar; null = sin esta regla.
+  minAttendancePercent  Decimal?      @map("min_attendance_percent") @db.Decimal(5, 2)
+  /// Criterios adicionales del SIEE, en texto (recuperaciones, casos especiales…).
+  notes                 String?       @db.VarChar(4000)
+  version               Int           @default(0)
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution  Institution           @relation(fields: [institutionId], references: [id])
+  academicYear AcademicYear          @relation(fields: [academicYearId], references: [id])
+  levels       PerformanceLevel[]
+  components   EvaluationComponent[]
+
+  @@map("grading_scheme")
+}
+
+/// Nivel de desempeño con su rango de notas (p. ej. Superior 4,6–5,0).
+model PerformanceLevel {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  schemeId  String  @map("scheme_id") @db.Uuid
+  code      String  @db.VarChar(20)
+  name      String  @db.VarChar(60)
+  minScore  Decimal @map("min_score") @db.Decimal(6, 2)
+  maxScore  Decimal @map("max_score") @db.Decimal(6, 2)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  scheme GradingScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, code])
+  @@map("performance_level")
+}
+
+/// Componente de evaluación del SIEE (p. ej. Cognitivo 60 %). Suman 100 %.
+model EvaluationComponent {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  schemeId      String  @map("scheme_id") @db.Uuid
+  code          String  @db.VarChar(20)
+  name          String  @db.VarChar(60)
+  weightPercent Decimal @map("weight_percent") @db.Decimal(5, 2)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  scheme      GradingScheme @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  assessments Assessment[]
+
+  @@unique([schemeId, code])
+  @@map("evaluation_component")
+}
+
+/// Actividad evaluativa de una asignatura en un grupo y período.
+model Assessment {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  institutionId   String    @map("institution_id") @db.Uuid
+  schoolGroupId   String    @map("school_group_id") @db.Uuid
+  subjectId       String    @map("subject_id") @db.Uuid
+  periodId        String    @map("period_id") @db.Uuid
+  componentId     String    @map("component_id") @db.Uuid
+  title           String    @db.VarChar(150)
+  description     String?   @db.VarChar(1000)
+  dueOn           DateTime? @map("due_on") @db.Date
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  institution Institution         @relation(fields: [institutionId], references: [id])
+  schoolGroup SchoolGroup         @relation(fields: [schoolGroupId], references: [id])
+  subject     Subject             @relation(fields: [subjectId], references: [id])
+  period      AcademicPeriod      @relation(fields: [periodId], references: [id])
+  component   EvaluationComponent @relation(fields: [componentId], references: [id])
+  grades      GradeRecord[]
+
+  @@index([schoolGroupId, subjectId, periodId])
+  @@map("assessment")
+}
+
+/// Nota de un estudiante (por su matrícula) en una actividad. Cada cambio queda en grade_record_change.
+model GradeRecord {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  assessmentId    String   @map("assessment_id") @db.Uuid
+  enrollmentId    String   @map("enrollment_id") @db.Uuid
+  /// null = la nota se retiró (el historial conserva la anterior).
+  score           Decimal? @db.Decimal(6, 2)
+  comment         String?  @db.VarChar(500)
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  version         Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assessment Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  enrollment Enrollment          @relation(fields: [enrollmentId], references: [id])
+  changes    GradeRecordChange[]
+
+  @@unique([assessmentId, enrollmentId])
+  @@index([enrollmentId])
+  @@map("grade_record")
+}
+
+/// Historial de una nota (solo inserción).
+model GradeRecordChange {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  gradeRecordId   String   @map("grade_record_id") @db.Uuid
+  previousScore   Decimal? @map("previous_score") @db.Decimal(6, 2)
+  newScore        Decimal? @map("new_score") @db.Decimal(6, 2)
+  reason          String?  @db.VarChar(500)
+  changedByUserId String?  @map("changed_by_user_id") @db.Uuid
+  changedAt       DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  gradeRecord GradeRecord @relation(fields: [gradeRecordId], references: [id], onDelete: Restrict)
+
+  @@index([gradeRecordId, changedAt])
+  @@map("grade_record_change")
 }

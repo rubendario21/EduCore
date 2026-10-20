@@ -64,6 +64,7 @@ export async function sqlStateOf(promise: Promise<unknown>): Promise<string | nu
 export const SQLSTATE = {
   /** ON DELETE RESTRICT: se intentó borrar una fila referenciada. */
   RESTRICT_VIOLATION: '23001',
+  INTEGRITY_VIOLATION: '23000',
   UNIQUE_VIOLATION: '23505',
   CHECK_VIOLATION: '23514',
   EXCLUSION_VIOLATION: '23P01',

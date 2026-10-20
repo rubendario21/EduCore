@@ -175,6 +175,12 @@ export class UserDto {
   @ApiProperty({ type: [UserRoleDto] }) roles: UserRoleDto[];
   @ApiProperty({ nullable: true }) lastLoginAt: string | null;
   @ApiProperty() createdAt: string;
+  @ApiPropertyOptional({
+    enum: ['SENT', 'FAILED'],
+    nullable: true,
+    description: 'Al crear la cuenta: si el correo de activación salió (null si no hacía falta)',
+  })
+  activationEmail?: 'SENT' | 'FAILED' | null;
 }
 
 export class PageMetaDto {

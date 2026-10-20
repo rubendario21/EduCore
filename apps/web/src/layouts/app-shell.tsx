@@ -6,7 +6,10 @@ import { productBrand } from '@/app/brand';
 import { visibleNavigation } from '@/app/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/input';
 import { useAuth } from '@/features/auth/auth-context';
+import { useProfile } from '@/features/auth/profile-context';
+import { landingOf, type Profile, PROFILE_INFO } from '@/features/auth/profiles';
 import { BrandMark } from '@/features/branding/brand-mark';
 import { cn } from '@/lib/utils';
 
@@ -65,10 +68,39 @@ function UserMenu() {
   );
 }
 
+/** Cambiar de perfil (p. ej. de Docente a Acudiente) sin volver a iniciar sesión. */
+function ProfileSwitcher() {
+  const { profiles, profile, setProfile } = useProfile();
+  const navigate = useNavigate();
+  if (profiles.length < 2 || !profile) return null;
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="hidden text-muted-foreground sm:inline">Ingresando como</span>
+      <Select
+        aria-label="Perfil"
+        className="h-8 w-auto"
+        value={profile}
+        onChange={(e) => {
+          const next = e.target.value as Profile;
+          setProfile(next);
+          navigate(landingOf(next));
+        }}
+      >
+        {profiles.map((p) => (
+          <option key={p} value={p}>
+            {PROFILE_INFO[p].label}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
+}
+
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, can } = useAuth();
-  const sections = visibleNavigation(can);
+  const { profile } = useProfile();
+  const sections = visibleNavigation(can, profile);
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
@@ -162,6 +194,7 @@ export function AppShell() {
             <Menu aria-hidden />
           </Button>
           <div className="ml-auto flex items-center gap-1">
+            <ProfileSwitcher />
             <ThemeToggle />
             <UserMenu />
           </div>

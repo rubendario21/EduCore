@@ -112,6 +112,24 @@ export class PasswordService {
     this.sendInBackground(message);
   }
 
+  /**
+   * Envía y espera la respuesta del proveedor. Lo usan las acciones de un
+   * administrador (invitar, reenviar), que deben saber si el correo salió; no
+   * se usa en la recuperación pública para no revelar si una cuenta existe.
+   */
+  async deliverNow(message: MailMessage): Promise<boolean> {
+    try {
+      await this.mail.send(message);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        { err: error instanceof Error ? { name: error.name, message: error.message } : error },
+        'No fue posible enviar el correo',
+      );
+      return false;
+    }
+  }
+
   /** Define una contraseña con un token de recuperación o de activación. */
   async resetWithToken(token: string, newPassword: string, client: ClientInfo): Promise<void> {
     const record = await this.repository.findPasswordToken(sha256Hex(token));
